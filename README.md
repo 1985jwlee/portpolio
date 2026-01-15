@@ -420,16 +420,42 @@ graph TB
 
 ### B2B 비즈니스 모델 확장
 
-```
-현재 (B2C):
-[ Game Server ] → [ 자사 플랫폼 ]
+```mermaid
+graph LR
+    subgraph "Core Game Engine"
+        CORE[Game Server Core<br/>변경 없음]
+    end
+    
+    subgraph "Event Stream"
+        KAFKA[Kafka Topics]
+    end
+    
+    subgraph "Tenant A"
+        PA[Platform A<br/>커스텀 로직]
+        DBA[(Database A)]
+    end
+    
+    subgraph "Tenant B"
+        PB[Platform B<br/>커스텀 로직]
+        DBB[(Database B)]
+    end
+    
+    subgraph "Tenant C"
+        PC[Platform C<br/>커스텀 로직]
+        DBC[(Database C)]
+    end
+    
+    CORE -->|Standard Events| KAFKA
+    KAFKA --> PA
+    KAFKA --> PB
+    KAFKA --> PC
+    PA --> DBA
+    PB --> DBB
+    PC --> DBC
+    
+    style CORE fill:#4169E1,stroke:#00008B,stroke-width:3px,color:#fff
+    style KAFKA fill:#FFA07A,stroke:#FF4500
 
-확장 (B2B):
-[ Core Game Server ]
-    ↓ Event Stream
-    ├── [ Tenant A Platform ]
-    ├── [ Tenant B Platform ]
-    └── [ Tenant C Platform ]
 ```
 
 **핵심**: 게임 서버 코드 수정 없이 확장 가능
