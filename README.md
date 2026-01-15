@@ -199,13 +199,42 @@ graph TB
 
 ### 장애 영향도 매트릭스
 
-| 장애 대상 | 게임플레이 | 기록 | 운영 API | 복구 시간 |
-|-----------|------------|------|----------|-----------|
-| 게임 서버 | 🔴 중단 | 🟡 일시 중단 | 🟢 정상 | 10초 (Redis) |
-| Redis | 🟡 순간 지연 | 🟢 정상 | 🟢 정상 | 즉시 |
-| Kafka | 🟢 정상 | 🟡 일시 중단 | 🟢 정상 | 즉시 |
-| MySQL | 🟢 정상 | 🟡 일시 중단 | 🔴 일부 실패 | 즉시 |
-| 플랫폼 서버 | 🟢 정상 | 🟡 일시 중단 | 🔴 중단 | 수초 |
+```mermaid
+graph TB
+    subgraph "Always Available"
+        GAMEPLAY[Game Server<br/>메모리 상태 관리]
+    end
+    
+    subgraph "Can Fail Without Impact"
+        KAFKA_FAIL[Kafka Down]
+        REDIS_FAIL[Redis Down]
+        DB_FAIL[Database Down]
+        PLATFORM_FAIL[Platform Server Down]
+    end
+    
+    subgraph "Degraded Mode"
+        BUFFER[Memory Event Buffer]
+        CACHE[In-Memory Cache]
+    end
+    
+    GAMEPLAY -->|정상 동작| KAFKA_FAIL
+    KAFKA_FAIL -->|버퍼링| BUFFER
+    BUFFER -.->|복구 시 재전송| KAFKA_FAIL
+    
+    GAMEPLAY -->|정상 동작| REDIS_FAIL
+    REDIS_FAIL -->|일시 캐시 사용| CACHE
+    
+    GAMEPLAY -->|정상 동작| DB_FAIL
+    GAMEPLAY -->|정상 동작| PLATFORM_FAIL
+    
+    style GAMEPLAY fill:#90EE90,stroke:#228B22,stroke-width:3px
+    style KAFKA_FAIL fill:#FFB6C1,stroke:#DC143C
+    style REDIS_FAIL fill:#FFB6C1,stroke:#DC143C
+    style DB_FAIL fill:#FFB6C1,stroke:#DC143C
+    style PLATFORM_FAIL fill:#FFB6C1,stroke:#DC143C
+    style BUFFER fill:#FFF8DC,stroke:#DAA520
+    style CACHE fill:#FFF8DC,stroke:#DAA520
+```
 
 **설계 철학**: 
 > "게임플레이는 어떤 백엔드 장애에도 멈추지 않는다"
@@ -308,7 +337,8 @@ public async Task HandlePlayerMoved(PlayerMovedEvent evt)
 }
 ```
 
-```sequenceDiagram
+```mermaid
+sequenceDiagram
     participant C as Client
     participant GS as Game Server
     participant K as Kafka
@@ -571,7 +601,7 @@ API: REST (Client → Server)
 ## 📧 Contact
 
 **Portfolio**: [GitHub Repository](https://github.com/1985jwlee)  
-**Email**: [이메일]  
+**Email**: [leejae.w.jl@icloud.com]  
 **Blog**: [기술 블로그]
 
 ---
