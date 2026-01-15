@@ -389,17 +389,33 @@ sequenceDiagram
 
 ### Zone 기반 수평 확장
 
-```
-100 CCU:
-[ Zone 1 ]
+```mermaid
+graph TB
+    subgraph "100 CCU"
+        Z1[Zone 1<br/>100 players]
+    end
+    
+    subgraph "1,000 CCU"
+        Z2_1[Zone 1<br/>100 players]
+        Z2_2[Zone 2<br/>100 players]
+        Z2_3[Zone 3<br/>100 players]
+        Z2_N[... Zone 10]
+    end
+    
+    subgraph "10,000 CCU"
+        COORD[Zone Coordinator<br/>Load Balancer]
+        Z3_1[Zone 1-10<br/>1,000 players]
+        Z3_2[Zone 11-20<br/>1,000 players]
+        Z3_N[... Zone 91-100]
+        
+        COORD --> Z3_1
+        COORD --> Z3_2
+        COORD --> Z3_N
+    end
+    
+    style Z1 fill:#E8F4F8,stroke:#4A90E2
+    style COORD fill:#FFB6C1,stroke:#DC143C,stroke-width:3px
 
-1,000 CCU:
-[ Zone 1 ] [ Zone 2 ] [ Zone 3 ]
-
-10,000 CCU:
-[ Zone Coordinator ]
-    ↓
-[ Zone 1~10 ]
 ```
 
 ### B2B 비즈니스 모델 확장
