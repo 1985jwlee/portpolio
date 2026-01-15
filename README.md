@@ -183,6 +183,34 @@ graph TB
 
 ```
 
+```mermaid
+sequenceDiagram
+    participant C as Client
+    participant GS as Game Server
+    participant K as Kafka
+    participant PS as Platform Server
+    participant DB as Database
+    
+    Note over C,GS: Command Pattern (동기)
+    C->>GS: MoveCommand(newPos)
+    GS->>GS: Validate Authority
+    alt Valid
+        GS->>GS: Update Memory State
+        GS->>C: MoveResponse(accepted)
+    else Invalid
+        GS->>C: MoveResponse(rejected)
+    end
+    
+    Note over GS,PS: Event Pattern (비동기)
+    GS->>K: PlayerMovedEvent
+    Note over K: Fire-and-Forget<br/>게임은 계속 진행
+    K->>PS: Event Delivery
+    PS->>PS: Idempotency Check
+    PS->>DB: Persist Movement
+    
+    Note over C,DB: 핵심: Kafka 응답을 기다리지 않음!
+```
+
 ### 핵심 패턴: Command vs Event
 
 | 구분 | Command | Domain Event |
@@ -351,31 +379,43 @@ public async Task HandlePlayerMoved(PlayerMovedEvent evt)
 ```
 
 ```mermaid
+
 sequenceDiagram
-    participant C as Client
+    autonumber
+    participant C as Unity Client
     participant GS as Game Server
+    participant M as Memory State
     participant K as Kafka
     participant PS as Platform Server
     participant DB as Database
     
-    Note over C,GS: Command Pattern (동기)
-    C->>GS: MoveCommand(newPos)
-    GS->>GS: Validate Authority
-    alt Valid
-        GS->>GS: Update Memory State
-        GS->>C: MoveResponse(accepted)
-    else Invalid
-        GS->>C: MoveResponse(rejected)
+    Note over C: Player presses W key
+    C->>GS: MoveCommand(playerId, newPosition)
+    
+    Note over GS: Server Authority
+    GS->>GS: Validate Move<br/>(충돌, 속도, 치트)
+    
+    alt Valid Move
+        GS->>M: Update player.Position
+        Note over M: 상태 변경 완료<br/>(메모리에서 즉시)
+        
+        GS->>K: Publish PlayerMovedEvent<br/>(Fire-and-Forget)
+        Note over GS,K: 비동기! Kafka 응답 안 기다림
+        
+        GS->>C: MoveResponse(success, newPosition)
+        Note over C: 화면 업데이트
+        
+        K->>PS: Deliver Event
+        PS->>PS: Idempotency Check<br/>(eventId 중복 확인)
+        PS->>DB: Save Movement History
+        
+    else Invalid Move
+        GS->>C: MoveResponse(rejected, reason)
+        Note over C: 이동 취소, 원위치
     end
     
-    Note over GS,PS: Event Pattern (비동기)
-    GS->>K: PlayerMovedEvent
-    Note over K: Fire-and-Forget<br/>게임은 계속 진행
-    K->>PS: Event Delivery
-    PS->>PS: Idempotency Check
-    PS->>DB: Persist Movement
-    
-    Note over C,DB: 핵심: Kafka 응답을 기다리지 않음!
+    Note over GS,DB: 중요: DB 저장 실패가 게임플레이를 막지 않음
+
 ```
 
 **핵심 포인트**:
