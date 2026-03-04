@@ -20,11 +20,28 @@
 
 > **"실시간 판정은 메모리에서 끝나고, 기록과 복구는 비동기로 흡수되는 구조를 실제로 증명한다."**
 
-이 포트폴리오는 대규모 MMO 완성을 목표로 하지 않습니다. **운영 가능한 실시간 시스템의 핵심 구조만을 최소 구현으로 증명**하는 것이 목적입니다.
+이 포트폴리오는 대규모 MMO 완성을 목표로 하지 않습니다.  
+**운영 가능한 실시간 시스템의 핵심 구조만을 최소 구현으로 증명**하는 것이 목적입니다.
 
 ---
 
 ## 로드맵 개요
+
+```mermaid
+gantt
+    title 구현 로드맵
+    dateFormat  YYYY-MM-DD
+    section Phase 0
+    설계 확정           :done, p0, 2026-01-01, 2d
+    section Phase 1
+    MVP 구현            :active, p1, after p0, 14d
+    section Phase 2
+    이벤트 신뢰성        :p2, after p1, 5d
+    section Phase 3
+    Hot/Cold Snapshot   :p3, after p2, 7d
+    section Phase 4
+    Admin Dashboard     :p4, after p3, 5d
+```
 
 | Phase | 내용 | 예상 소요 | 상태 |
 |-------|------|-----------|------|
@@ -38,12 +55,12 @@
 
 ### Phase별 완료 조건 요약
 
-| Phase | 핵심 완료 조건 |
-|-------|---------------|
-| **Phase 1** | 클라이언트 → 서버 → Kafka → 플랫폼 → DB 전체 흐름 동작 |
-| **Phase 2** | 동일 이벤트 2회 전송 시 1회만 처리, DLQ로 실패 이벤트 분리 |
-| **Phase 3** | 게임 서버 재시작 후 플레이어 상태 복원 (Redis → MongoDB 순차) |
-| **Phase 4** | 실시간 모니터링 + Snapshot 관리 UI 동작 |
+| Phase | 핵심 완료 조건 | 증명하는 것 |
+|-------|---------------|------------|
+| **Phase 1** | Client → Server → Kafka → Platform → DB 전체 흐름 동작 | 핵심 구조 동작 |
+| **Phase 2** | 동일 이벤트 2회 전송 시 1회만 처리, DLQ로 실패 이벤트 분리 | 이벤트 신뢰성 |
+| **Phase 3** | 서버 재시작 후 플레이어 상태 복원 (Redis → MongoDB 순차) | 복구 가능성 |
+| **Phase 4** | 실시간 모니터링 + Snapshot 관리 UI 동작 | 운영 가능성 |
 
 ---
 
@@ -61,6 +78,8 @@
 ✓ 게임 서버는 DB 성공/실패를 기다리지 않는다
 ```
 
+**산출물:** README.md, architecture-detail.md, design-decisions.md, operational-guide.md, diagrams.md
+
 > 이 단계는 이후 모든 구현 판단의 기준선이 됩니다.
 
 ---
@@ -71,7 +90,18 @@
 
 **목적:** 실시간 게임 서버와 이벤트 기반 플랫폼 서버가 실제로 분리되어 동작함을 증명
 
-> 구체적 구현 코드는 [기술 스택 가이드](docs/tech-stack-guide.md)를 참조합니다.
+```mermaid
+flowchart LR
+    UNITY["Unity\nClient"] -->|"TCP Command"| GS["C# Game\nServer"]
+    GS -->|"Validate\n→ Memory"| MEM["In-Memory\nState"]
+    GS -->|"Fire & Forget"| KAFKA["Kafka"]
+    KAFKA --> PS["Platform\nServer"]
+    PS --> DB["MySQL"]
+
+    style GS fill:#e74c3c,color:#fff
+    style KAFKA fill:#f39c12,color:#fff
+    style DB fill:#27ae60,color:#fff
+```
 
 ---
 
@@ -80,7 +110,7 @@
 **구현 범위:**
 ```
 ✓ TCP/IP 소켓 서버        ✓ Session 관리
-✓ Packet → Command 변환   ✓ 단일 GameLoop Tick
+✓ Packet → Command 변환   ✓ 단일 GameLoop Tick (50ms)
 ✓ In-memory Player State  ✓ Domain Event 생성
 ✓ Kafka Producer 연동
 ```
@@ -88,7 +118,7 @@
 **의도적으로 구현하지 않는 것:**
 ```
 ✗ 전투 시스템           ✗ MMO 콘텐츠
-✗ 복잡한 동기화 로직     ✗ 클라이언트 예측
+✗ 복잡한 동기화 로직     ✗ 클라이언트 예측(Prediction)
 ✗ 인벤토리 시스템
 ```
 
@@ -97,12 +127,12 @@
 ☐ TCP 서버 기동                ☐ 클라이언트 연결 수락
 ☐ 패킷 수신 및 역직렬화         ☐ Command 생성
 ☐ GameLoop Tick 동작           ☐ Domain Event 발행
-☐ Kafka 연동                  ☐ 로그 출력
+☐ Kafka 연동                   ☐ 로그 출력
 ```
 
 ---
 
-### 1-2. 플랫폼 서버 (TypeScript / bun.js)
+### 1-2. 플랫폼 서버 (TypeScript / Bun.js)
 
 **구현 범위:**
 ```
@@ -156,7 +186,7 @@
 ☐ Kafka로 이벤트 발행
 ☐ 플랫폼 서버에서 이벤트 수신
 ☐ DB에 이동 기록 저장
-☐ 1분 영상 녹화
+☐ 1분 데모 영상 녹화
 ```
 
 **이 단계까지가 MVP이며, 여기까지만으로도 포트폴리오로 충분한 설득력을 가집니다.**
@@ -167,82 +197,51 @@
 
 ### 📋 계획 | 예상 소요: 3~5일
 
-**목적:** Kafka 기반 구조에서 반드시 질문받게 되는 "이벤트 신뢰성"에 대한 답을 제시
+**목적:** Kafka 기반 구조에서 반드시 질문받는 "이벤트 신뢰성"에 대한 답을 제시
 
----
-
-### 2-1. Domain Event 메타데이터 추가
+### 2-1. Idempotency (멱등성)
 
 ```csharp
-public abstract class DomainEvent
+// 이벤트 중복 처리 방지
+public class IdempotencyService
 {
-    public string EventId { get; set; }        // UUID — Idempotency 키
-    public string AggregateId { get; set; }    // playerId 또는 entityId
-    public DateTime OccurredAt { get; set; }   // 발생 시각
-    public int Version { get; set; }           // 이벤트 버전
+    public async Task<bool> IsAlreadyProcessed(string eventId)
+    {
+        return await _redis.KeyExistsAsync($"processed:{eventId}");
+    }
+
+    public async Task MarkAsProcessed(string eventId)
+    {
+        await _redis.StringSetAsync(
+            $"processed:{eventId}",
+            "1",
+            TimeSpan.FromDays(7)  // 7일간 중복 체크
+        );
+    }
 }
 ```
 
----
+### 2-2. Dead Letter Queue (DLQ)
 
-### 2-2. Idempotency 구현
+```mermaid
+flowchart LR
+    KAFKA["Kafka\ngame.events"] --> CONSUMER["Platform\nConsumer"]
+    CONSUMER -->|"처리 성공"| DB["MySQL"]
+    CONSUMER -->|"3회 실패"| DLQ["DLQ\ngame.events.dlq"]
+    DLQ --> ALERT["알림 발송"]
+    DLQ --> MANUAL["수동 재처리"]
 
-```typescript
-class IdempotentEventHandler {
-  async handle(event: DomainEvent) {
-    const key = `event:${event.eventId}`;
-
-    // 이미 처리된 이벤트인지 확인
-    const processed = await this.redis.get(key);
-    if (processed) {
-      logger.info(`Event already processed: ${event.eventId}`);
-      return;
-    }
-
-    try {
-      await this.processEvent(event);
-      await this.redis.setex(key, 3600, 'processed'); // TTL: 1시간
-    } catch (error) {
-      await this.sendToDLQ(event, error); // 실패 시 DLQ로 전송
-    }
-  }
-}
+    style DLQ fill:#e74c3c,color:#fff
+    style ALERT fill:#f39c12,color:#fff
 ```
 
----
-
-### 2-3. DLQ (Dead Letter Queue)
-
+**체크리스트:**
 ```
-정상 흐름:
-[ Game Server ] → [ Kafka ] → [ Platform Server ] → [ DB ]
-
-실패 흐름:
-[ Game Server ] → [ Kafka ] → [ Platform Server ]
-                                     ↓ (실패)
-                                [ DLQ Topic ]
-                                     ↓ (수동 처리)
-                                [ Admin Review ]
-```
-
-**핵심 원칙:**
-```
-✓ DB 저장 실패 시 즉시 재시도하지 않음
-✓ 게임 서버는 실패 여부를 알지 못함
-✓ 실패 처리는 전적으로 운영 영역의 책임
-```
-
----
-
-### Phase 2 완료 조건
-
-```
-☐ Event ID 추가
-☐ Idempotency 검증 로직
-☐ Redis 중복 체크
-☐ DLQ Topic 생성
-☐ 실패 이벤트 DLQ 전송
-☐ 테스트: 동일 이벤트 2번 전송 시 1번만 처리
+☐ Idempotency Key 설계 (eventId 기반)
+☐ Redis 기반 중복 확인 구현
+☐ DLQ Topic 생성 (game.events.dlq)
+☐ 실패 이벤트 DLQ 라우팅
+☐ 테스트: 동일 이벤트 2회 전송 → 1회만 처리 확인
 ```
 
 ---
@@ -251,37 +250,34 @@ class IdempotentEventHandler {
 
 ### 📋 계획 | 예상 소요: 4~7일
 
-**목적:** 게임 서버 장애 시에도 서비스가 복구 가능함을 구조적으로 증명
-
----
+**목적:** 게임 서버 재시작 후 플레이어 상태가 복원됨을 실제로 증명
 
 ### 3-1. Hot Snapshot (Redis)
 
 ```csharp
 public class RedisSnapshotService
 {
-    // 주기적으로 Player State 저장 (5~10초)
-    public async Task SaveHotSnapshot(Player player)
+    private const int SnapshotTtlSeconds = 300; // 5분
+
+    public async Task SaveHotSnapshot(Zone zone)
     {
-        var key = $"snapshot:player:{player.Id}";
-        var snapshot = MessagePackSerializer.Serialize(player);
-        await _redis.SetAsync(key, snapshot, TimeSpan.FromMinutes(5)); // TTL: 5분
+        var snapshot = JsonSerializer.Serialize(zone.Serialize());
+        await _redis.StringSetAsync(
+            $"snapshot:zone:{zone.Id}",
+            snapshot,
+            TimeSpan.FromSeconds(SnapshotTtlSeconds)
+        );
     }
 
-    // 복구
-    public async Task<Player> LoadHotSnapshot(string playerId)
+    public async Task<ZoneSnapshot?> LoadHotSnapshot(string zoneId)
     {
-        var key = $"snapshot:player:{playerId}";
-        var snapshot = await _redis.GetAsync<byte[]>(key);
-        if (snapshot == null) return null;
-        return MessagePackSerializer.Deserialize<Player>(snapshot);
+        var data = await _redis.StringGetAsync($"snapshot:zone:{zoneId}");
+        return data.HasValue
+            ? JsonSerializer.Deserialize<ZoneSnapshot>(data!)
+            : null;
     }
 }
 ```
-
-특징: 정확성보다 속도를 우선, TTL로 자동 정리, 수초 내 복구 가능
-
----
 
 ### 3-2. Cold Snapshot (MongoDB)
 
@@ -299,42 +295,30 @@ public class MongoSnapshotService
         };
         await _mongo.InsertOneAsync(snapshot);
     }
-
-    public async Task<ZoneSnapshot> LoadColdSnapshot(string zoneId)
-    {
-        return await _mongo
-            .Find(s => s.ZoneId == zoneId)
-            .SortByDescending(s => s.Timestamp)
-            .FirstOrDefaultAsync();
-    }
 }
 ```
 
-특징: 장기 보관, Checksum으로 정합성 검증, 점검/분석 용도
-
----
-
 ### 3-3. 복구 우선순위
 
-```
-[ 게임 서버 크래시 ]
-    ↓
-1. Redis Snapshot 존재? → Yes → 즉시 복구 (수초)
-    ↓ No
-2. MongoDB Snapshot 존재? → Yes → 복구 (수분)
-    ↓ No
-3. 초기 상태로 시작 (Kafka Event Replay로 보정 가능)
+```mermaid
+flowchart TD
+    CRASH["게임 서버 크래시"] --> R1{"Redis\nSnapshot?"}
+    R1 -->|"Yes"| FAST["즉시 복구 (수초)"]
+    R1 -->|"No"| R2{"MongoDB\nSnapshot?"}
+    R2 -->|"Yes"| SLOW["복구 (수분)"]
+    R2 -->|"No"| REPLAY["초기 상태\n+ Kafka Event Replay"]
+
+    style FAST fill:#27ae60,color:#fff
+    style SLOW fill:#f39c12,color:#fff
+    style REPLAY fill:#e74c3c,color:#fff
 ```
 
----
-
-### Phase 3 완료 조건
-
+**체크리스트:**
 ```
-☐ Redis Snapshot 저장/로드
-☐ MongoDB Snapshot 저장/로드
-☐ 복구 우선순위 로직
-☐ 테스트: 게임 서버 재시작 후 플레이어 상태 복원
+☐ Redis Snapshot 저장 / 로드
+☐ MongoDB Snapshot 저장 / 로드
+☐ 복구 우선순위 로직 구현
+☐ 테스트: 게임 서버 재시작 후 플레이어 상태 복원 확인
 ```
 
 ---
@@ -345,76 +329,29 @@ public class MongoSnapshotService
 
 **목적:** 운영 도구를 실제로 구현하여 시스템의 운영 가능성을 증명
 
-**관련 프로젝트**: [React Object State Manager](https://github.com/1985jwlee/portpolio_react)
-
----
+**관련 선행 프로젝트**: [React Object State Manager](https://github.com/1985jwlee/portpolio_react) — 핵심 UI 패턴 이미 검증 완료
 
 ### 구현 예정 기능
 
 ```
 1. 실시간 모니터링          2. 플레이어 상태 조회
    - Zone별 CCU               - 오브젝트 상태
-   - Tick 지연 모니터링         - Component 필드값 실시간 조회
-   - Health Check 현황         - 상태 변경 이력
+   - Tick 지연 모니터링         - 상태 변경 이력
 
 3. Event Stream 시각화      4. 장애 대응 인터페이스
-   - Topic별 이벤트 흐름        - Snapshot 복구 트리거
-   - Consumer Lag 모니터링      - 서버 재시작 컨트롤
-   - 이벤트 처리 속도           - 긴급 공지 발송
+   - Consumer Lag 모니터링      - Snapshot 복구 트리거
+   - 이벤트 처리 속도           - 서버 재시작 컨트롤
 
 5. Snapshot 관리
-   - Hot/Cold Snapshot 조회
+   - Hot/Cold Snapshot 목록 조회
    - 수동 Snapshot 생성
-   - 복구 테스트
 ```
 
-### 기술 스택
-
+**체크리스트:**
 ```
-Frontend: React 19 + TypeScript
-State: Zustand (전역 상태 관리)
-UI: Tailwind CSS
-Real-time: WebSocket (Server → Client)
-API: REST (Client → Server)
-```
-
-### 플랫폼 서버 WebSocket API
-
-```typescript
-import { Elysia } from 'elysia';
-import { ws } from '@elysiajs/websocket';
-
-const app = new Elysia()
-  .use(ws())
-  .ws('/ws/monitor', {
-    open(ws) {
-      const interval = setInterval(() => {
-        ws.send({
-          type: 'metrics',
-          data: {
-            ccu: getCurrentCCU(),
-            tickDelay: getAverageTickDelay(),
-            eventRate: getEventRate()
-          }
-        });
-      }, 1000);
-      ws.data.interval = interval;
-    },
-    close(ws) {
-      clearInterval(ws.data.interval);
-    }
-  });
-```
-
----
-
-### Phase 4 완료 조건
-
-```
-☐ WebSocket API 구현
+☐ WebSocket API 구현 (실시간 메트릭 전송)
 ☐ React Dashboard 구현
-☐ 실시간 모니터링 기능
-☐ 플레이어 상태 조회
+☐ Zone별 CCU 실시간 모니터링
 ☐ Snapshot 관리 UI
 ☐ 데모 영상 녹화
 ```
@@ -432,3 +369,5 @@ const app = new Elysia()
 ---
 
 [← 메인으로 돌아가기](../README.md)
+
+**Last Updated**: 2026-03-04
